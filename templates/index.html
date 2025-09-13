@@ -2,23 +2,37 @@
 <html>
   <head>
     <meta charset='utf-8'/>
-    <title>Django RAG Chat Demo</title>
+    <title>Django RAG Chat (Replit demo)</title>
     <style>
       body { font-family: Arial, Helvetica, sans-serif; max-width: 900px; margin: 20px auto; }
-      .chat { border: 1px solid #ddd; padding: 12px; height: 400px; overflow-y: auto; background: #fafafa; }
-      .msg { margin: 8px 0; }
-      .user { text-align: right; }
-      .ai { text-align: left; color: #222; }
-      .meta { font-size: 12px; color: #666; }
-      .controls { margin-top: 12px; display:flex; gap:8px; }
+      header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+      h2 { margin: 0 0 8px 0; }
+      .chat { border: 1px solid #ddd; padding: 12px; height: 420px; overflow-y: auto; background: #fafafa; margin-top:12px; }
+      .msg { margin: 8px 0; padding:6px; border-radius:6px; max-width:80%; }
+      .user { margin-left:auto; background:#daf1ff; text-align:right; }
+      .ai { margin-right:auto; background:#fff; border:1px solid #eee; }
+      .meta { font-size: 12px; color: #666; margin-bottom:6px; }
+      .controls { margin-top: 12px; display:flex; gap:8px; align-items:center; }
+      .controls input[type="text"] { flex:1; padding:10px; border-radius:6px; border:1px solid #ccc; }
+      .controls button { padding:10px 14px; border-radius:6px; border:none; background:#2563eb; color:white; cursor:pointer; }
+      .small { font-size:13px; color:#444; }
+      .mode-toggle { display:flex; gap:6px; align-items:center; }
     </style>
   </head>
   <body>
-    <h2>Django RAG Chat (minimal)</h2>
-    <p>Upload documents (PDF, DOCX, TXT) and ask questions based on uploaded documents. No OpenAI API required.</p>
+    <header>
+      <div>
+        <h2>Django RAG Chat</h2>
+        <div class="small">Upload docs (PDF / DOCX / TXT) and ask questions — or ask anything general.</div>
+      </div>
+      <div class="mode-toggle">
+        <label><input type="radio" name="mode" value="rag" checked/> Doc RAG</label>
+        <label><input type="radio" name="mode" value="general"/> General</label>
+      </div>
+    </header>
 
-    <div>
-      <form id="upload-form">
+    <div style="margin-top:12px;">
+      <form id="upload-form" style="display:flex; gap:8px;">
         <input type="file" name="file" id="file-input" />
         <button type="submit">Upload</button>
       </form>
@@ -27,7 +41,7 @@
     <div class="chat" id="chat-window"></div>
 
     <div class="controls">
-      <input type="text" id="question" placeholder="Ask a question..." style="flex:1" />
+      <input type="text" id="question" placeholder="Ask anything..." />
       <button id="ask">Ask</button>
     </div>
 
@@ -38,8 +52,12 @@
         const res = await fetch('/api/upload/', { method: 'POST', body: fd });
         return res.json();
       }
-      async function askQuestion(q) {
-        const res = await fetch('/api/chat/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: q}) });
+      async function askQuestion(q, mode) {
+        const res = await fetch('/api/chat/', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({question: q, mode: mode})
+        });
         return res.json();
       }
 
@@ -47,7 +65,13 @@
       function addMessage(text, who='ai') {
         const div = document.createElement('div');
         div.className = 'msg ' + (who==='user' ? 'user' : 'ai');
-        div.innerHTML = '<div class="meta">' + (who==='user' ? 'You' : 'AI') + '</div><div>' + (text || '') + '</div>';
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = who === 'user' ? 'You' : 'AI';
+        const body = document.createElement('div');
+        body.innerHTML = (text || '').replace(/\n/g, '<br/>');
+        div.appendChild(meta);
+        div.appendChild(body);
         chatWindow.appendChild(div);
         chatWindow.scrollTop = chatWindow.scrollHeight;
       }
@@ -68,16 +92,29 @@
       document.getElementById('ask').addEventListener('click', async () => {
         const q = document.getElementById('question').value.trim();
         if (!q) return;
+        // get selected mode
+        const mode = document.querySelector('input[name="mode"]:checked').value;
         addMessage(q, 'user');
         addMessage('...', 'ai');
-        const res = await askQuestion(q);
+        const res = await askQuestion(q, mode === 'rag' ? 'doc' : 'general');
         // replace last '...' message
         const msgs = chatWindow.querySelectorAll('.msg');
         const last = msgs[msgs.length-1];
         if (res.answer) {
           last.innerHTML = '<div class="meta">AI</div><div>' + (res.answer.replace(/\n/g, '<br/>')) + '</div>';
+          if (res.context) {
+            last.innerHTML += '<div style="font-size:12px;color:#666;margin-top:8px;">Sources included from uploaded docs.</div>';
+          }
         } else {
           last.innerHTML = '<div class="meta">AI</div><div>Error: ' + JSON.stringify(res) + '</div>';
+        }
+      });
+
+      // allow Enter to submit
+      document.getElementById('question').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('ask').click();
         }
       });
     </script>
