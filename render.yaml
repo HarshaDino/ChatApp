@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: rag-django-chatbot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn rag_django.wsgi:application --bind 0.0.0.0:$PORT
+    plan: free
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: rag_django.settings
+      - key: PYTHONUNBUFFERED
+        value: 1
+    disk:
+      name: data
+      mountPath: /opt/render/project/data
+      sizeGB: 1
